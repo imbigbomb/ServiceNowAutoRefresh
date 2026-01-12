@@ -12,7 +12,7 @@ A desktop automation tool built with Python for IT Support and Service Desk team
 
 * **Dual-Window Monitoring**: Simultaneously monitors two different browser tabs (e.g., Incidents and Catalog Tasks).
 * **Intelligent Image Recognition**: Uses OpenCV-powered scanning to detect "Open" or "New" labels on your screen with adjustable confidence levels.
-* **Audio Alerts**: Plays a custom `.wav` file or a system beep when a new ticket is detected.
+* **Audio Alerts**: Plays a custom audio file or a system beep when a new ticket is detected.
 * **Real-time Visual Logs**: A GUI-based log area with precise timestamps for every scan and action.
 * **Persistent Settings**: Built-in Settings menu to update URLs and scan intervals without touching the code. Settings are saved locally in `config.ini`.
 * **Silent Background Mode**: Can be run as a `.pyw` file to hide the console/CMD window for a cleaner workspace.
@@ -29,7 +29,7 @@ Ensure the following files are located in the same directory:
 | `config.ini` | Configuration file (auto-generated on first run). |
 | `alert.wav` | Your custom alert sound file. |
 | `open_label.png` | Screenshot of the "Open" status label. |
-| `new_label.png` | Screenshot of the "New" status label. |
+| `empty_label.png` | Screenshot of the "empty" status label. |
 | `requirements.txt` | List of required Python libraries. |
 
 ---
@@ -47,7 +47,7 @@ pip install pyautogui pygetwindow pygame opencv-python pillow
 
 #### 2. Prepare Assets
 
-* **Screenshots**: Use a snipping tool to capture the "Open" and "New" labels from your ticket system. Save them as `open_label.png` and `new_label.png` in the script folder.
+* **Screenshots**: Use a snipping tool to capture the "Open" and "empty" labels from your ticket system. Save them as `open_label.png` and `new_label.png` in the script folder.
 * **Audio**: Place a short audio file named `alert.wav` in the same folder.
 
 #### 3. Configuration
@@ -78,4 +78,3 @@ Launch the application and click the **⚙ Settings** button:
 
 * **Window Titles**: The script identifies your browser by its window title. If your system's title changes, update the `WINDOW_TITLE` variables in the code.
 * **Display Scaling**: Keep your Windows Display Settings at 100% or ensure you take screenshots at the same scaling level you intend to use.
-* **Percent Sign (%) Error**: This version is patched with `interpolation=None` to prevent crashes caused by complex URLs containing `%` characters.
