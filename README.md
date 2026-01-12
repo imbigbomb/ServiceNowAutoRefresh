@@ -79,7 +79,3 @@ Launch the application and click the **⚙ Settings** button:
 * **Window Titles**: The script identifies your browser by its window title. If your system's title changes, update the `WINDOW_TITLE` variables in the code.
 * **Display Scaling**: Keep your Windows Display Settings at 100% or ensure you take screenshots at the same scaling level you intend to use.
 * **Percent Sign (%) Error**: This version is patched with `interpolation=None` to prevent crashes caused by complex URLs containing `%` characters.
-
----
-
-**Would you like instructions on how to package this script into a standalone `.exe` file for easier sharing?**
