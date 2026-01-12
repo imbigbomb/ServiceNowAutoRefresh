@@ -12,7 +12,7 @@
 
 * **双页面自动刷新**：支持同时监控两个不同的浏览器窗口（如 Incidents 和 Catalog Tasks）。
 * **智能图像识别**：通过屏幕扫描识别“Open”和“New”等状态标签，支持模糊匹配提高准确率。
-* **多媒体报警**：检测到新工单时播放自定义 `.wav` 音频，并支持系统蜂鸣音备份。
+* **多媒体报警**：检测到新工单时播放自定义音频，并支持系统蜂鸣音。
 * **实时可视化日志**：带时间戳的 GUI 日志界面，每一轮扫描结果清晰可见。
 * **持久化设置**：内置设置菜单，可直接修改 URL 和监控间隔，设置自动保存至 `config.ini`。
 * **后台静默运行**：支持以 `.pyw` 方式运行，无黑色 CMD 窗口干扰。
@@ -29,7 +29,7 @@
 | `config.ini` | 配置文件（程序运行后自动生成） |
 | `alert.wav` | 报警提示音（需准备） |
 | `open_label.png` | “Open”状态的截图（需准备） |
-| `new_label.png` | “New”状态的截图（需准备） |
+| `empty_label.png` | “empty”状态的截图（需准备） |
 | `requirements.txt` | 依赖库列表 |
 
 ---
@@ -47,7 +47,7 @@ pip install pyautogui pygetwindow pygame opencv-python pillow
 
 #### 2. 准备素材
 
-* **截图**：使用截图工具截取工单系统中“Open”和“New”标签的小图，分别命名为 `open_label.png` 和 `new_label.png`。
+* **截图**：使用截图工具截取工单系统中“Open”和“empty”标签的小图，分别命名为 `open_label.png` 和 `new_label.png`。
 * **音频**：准备一个短促的报警音，命名为 `alert.wav`。
 
 #### 3. 配置参数
@@ -78,4 +78,3 @@ pip install pyautogui pygetwindow pygame opencv-python pillow
 
 * **窗口标题**：程序通过窗口标题匹配浏览器。如果浏览器标签页被遮挡或标题改变，请在代码顶部的 `WINDOW_TITLE` 处修改。
 * **缩放比例**：请保持系统显示缩放（Windows Settings）为 100% 或在截图时保持一致，否则图像识别可能失效。
-* **插值报错**：本版本已处理 URL 中 `%` 字符引起的 `interpolation` 报错。
