@@ -1,0 +1,5 @@
+pyautogui
+pygetwindow
+pygame
+opencv-python
+pillow
