@@ -48,10 +48,17 @@ class MonitorApp:
 
     def load_settings(self):
         """读取或创建 config.ini"""
-        self.config = configparser.ConfigParser()
+        # 关键修改：添加 interpolation=None
+        self.config = configparser.ConfigParser(interpolation=None)
+        
         if os.path.exists(CONFIG_PATH):
-            self.config.read(CONFIG_PATH, encoding='utf-8')
-        else:
+            try:
+                self.config.read(CONFIG_PATH, encoding='utf-8')
+            except Exception as e:
+                print(f"读取配置文件出错: {e}")
+        
+        # 检查是否存在 Settings 节，如果不存在或配置损坏，则初始化默认值
+        if 'Settings' not in self.config:
             self.config['Settings'] = {
                 'url_1': DEFAULT_URL_1,
                 'url_2': DEFAULT_URL_2,
@@ -219,3 +226,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = MonitorApp(root)
     root.mainloop()
+
