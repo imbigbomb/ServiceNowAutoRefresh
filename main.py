@@ -8,10 +8,11 @@ import tkinter as tk
 from tkinter import scrolledtext, messagebox
 from datetime import datetime
 import configparser
-import winsound  # Windows 原生音频库，无需 pygame
+import winsound  # Windows 原生音频库，无需 pygame 驱动
 import ctypes
+from pyscreeze import ImageNotFoundException  # 解决找不到图片时抛异常的根源
 
-# 1. 解决 Windows 高分屏 DPI 缩放导致识别不到图片的问题
+# 1. 解决 Windows 高分屏 DPI 缩放导致截屏与图片匹配不上的问题
 try:
     ctypes.windll.shcore.SetProcessDpiAwareness(2) # Per-monitor DPI aware
 except Exception:
@@ -45,13 +46,16 @@ class MonitorApp:
         self.root.title("ServiceNow工单监控")
         self.root.geometry("600x420")
         
+        # 内部变量映射
         self.is_running = False
         self.monitor_thread = None
         
+        # 加载持久化配置
         self.load_settings()
         self.setup_ui()
 
     def load_settings(self):
+        """读取或创建 config.ini"""
         self.config = configparser.ConfigParser(interpolation=None)
         if os.path.exists(CONFIG_PATH):
             try:
@@ -76,6 +80,7 @@ class MonitorApp:
             self.config.write(f)
 
     def setup_ui(self):
+        # 按钮区
         btn_frame = tk.Frame(self.root)
         btn_frame.pack(pady=10)
 
@@ -88,11 +93,13 @@ class MonitorApp:
         self.settings_btn = tk.Button(btn_frame, text="⚙ 设置", command=self.open_settings_window, width=8, height=2)
         self.settings_btn.grid(row=0, column=2, padx=5)
 
+        # 日志区
         self.log_area = scrolledtext.ScrolledText(self.root, width=75, height=20, state='disabled', font=("Consolas", 9))
         self.log_area.pack(padx=10, pady=10)
         self.log("读取配置成功")
 
     def open_settings_window(self):
+        """弹出二级设置菜单"""
         win = tk.Toplevel(self.root)
         win.title("自定义参数")
         win.geometry("400x250")
@@ -142,17 +149,18 @@ class MonitorApp:
         self.log("已弹出浏览器窗口。")
 
     def play_alert(self):
-        """原生 Windows 音频播放，稳定无堵塞"""
+        """优化版系统级原生音频播放（异步不卡顿，且极稳定）"""
         def _play():
             try:
                 if os.path.exists(WAV_PATH):
-                    # SND_FILENAME 指定文件名，SND_ASYNC 异步播放不卡主线程
+                    # 使用 Windows 内置 API 异步播放 alert.wav
                     winsound.PlaySound(WAV_PATH, winsound.SND_FILENAME | winsound.SND_ASYNC)
                 else:
-                    self.log(f"⚠️ 未找到音频文件 {WAV_PATH}，改用系统蜂鸣器")
-                    winsound.Beep(1000, 1500) # 1000Hz 持续 1.5 秒
+                    # 找不到文件时采用蜂鸣器兜底（频率1000Hz，响 1.5 秒）
+                    self.log(f"⚠️ 找不到 {WAV_PATH}，触发系统蜂鸣...")
+                    winsound.Beep(1000, 1500)
             except Exception as e:
-                self.log(f"播放报警声失败: {e}")
+                self.log(f"音频播放出错: {e}")
                 try:
                     winsound.Beep(1000, 1500)
                 except:
@@ -183,7 +191,7 @@ class MonitorApp:
             
             # 1. 刷新流程
             self.refresh_windows(WINDOW_TITLE_1)
-            time.sleep(1)
+            time.sleep(1) # 增加小缓冲
             if not self.is_running: break
             self.refresh_windows(WINDOW_TITLE_2)
             
@@ -202,22 +210,26 @@ class MonitorApp:
                     self.log(f"❌ 找不到图片模版文件: {path}")
                     continue
                 try:
-                    # 执行屏幕找图
+                    # 尝试在屏幕寻找图片
                     location = pyautogui.locateOnScreen(path, confidence=CONFIDENCE_LEVEL, grayscale=True)
                     if location is not None:
                         self.log(f"🎯【发现工单】类型: {label} (位置: {location})")
                         found = True
+                except ImageNotFoundException:
+                    # 屏幕上没找到图片是正常情况，直接忽略，不打印报错
+                    pass
                 except Exception as e:
-                    # 关键修改：输出具体报错，避免因缺少 opencv-python 导致隐蔽静默失败
-                    self.log(f"⚠️ 识别【{label}】时出错: {e}")
+                    # 真正的环境或依赖问题才会抛出
+                    self.log(f"⚠️ 系统扫描报错【{label}】: {type(e).__name__} - {e}")
             
+            # 4. 结果响应
             if found: 
-                self.log("🔊 正在触发报警声音...")
+                self.log("🔊 发现新工单，触发报警提示音！")
                 self.play_alert()
             else: 
                 self.log("本轮未发现新工单。")
 
-            # 4. 周期睡眠
+            # 5. 周期休眠
             wait = loop_interval - 25 if loop_interval > 25 else 1
             self.log(f"休眠中，{wait} 秒后开始下轮刷新...")
             for _ in range(wait):
