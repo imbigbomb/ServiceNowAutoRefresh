@@ -1,7 +1,6 @@
 import pyautogui
 import pygetwindow as gw
 import time
-import pygame
 import threading
 import os
 import webbrowser
@@ -9,7 +8,17 @@ import tkinter as tk
 from tkinter import scrolledtext, messagebox
 from datetime import datetime
 import configparser
-import winsound  # 导入用于兜底报警
+import winsound  # Windows 原生音频库，无需 pygame
+import ctypes
+
+# 1. 解决 Windows 高分屏 DPI 缩放导致识别不到图片的问题
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(2) # Per-monitor DPI aware
+except Exception:
+    try:
+        ctypes.windll.user32.SetProcessDpiAware()
+    except Exception:
+        pass
 
 # 获取当前脚本所在的文件夹绝对路径
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -22,8 +31,8 @@ DEFAULT_URL_1 = "https://your-incident-url.com"
 DEFAULT_URL_2 = "https://your-sctask-url.com"
 DEFAULT_INTERVAL = 120
 
-# 建议使用 .wav 格式，兼容性更强
-MP3_PATH = os.path.join(BASE_DIR, "alert.wav") 
+# 声音文件路径 (.wav 格式)
+WAV_PATH = os.path.join(BASE_DIR, "alert.wav") 
 IMAGE_FILES = {
     "Open 标签": os.path.join(BASE_DIR, "open_label.png"),
     "empty 标签": os.path.join(BASE_DIR, "empty_label.png")
@@ -34,18 +43,15 @@ class MonitorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("ServiceNow工单监控")
-        self.root.geometry("600x400") # 稍微增加高度以适应日志
+        self.root.geometry("600x420")
         
-        # 内部变量映射
         self.is_running = False
         self.monitor_thread = None
         
-        # 加载持久化配置
         self.load_settings()
         self.setup_ui()
 
     def load_settings(self):
-        """读取或创建 config.ini"""
         self.config = configparser.ConfigParser(interpolation=None)
         if os.path.exists(CONFIG_PATH):
             try:
@@ -70,7 +76,6 @@ class MonitorApp:
             self.config.write(f)
 
     def setup_ui(self):
-        # 按钮区
         btn_frame = tk.Frame(self.root)
         btn_frame.pack(pady=10)
 
@@ -83,13 +88,11 @@ class MonitorApp:
         self.settings_btn = tk.Button(btn_frame, text="⚙ 设置", command=self.open_settings_window, width=8, height=2)
         self.settings_btn.grid(row=0, column=2, padx=5)
 
-        # 日志区
         self.log_area = scrolledtext.ScrolledText(self.root, width=75, height=20, state='disabled', font=("Consolas", 9))
         self.log_area.pack(padx=10, pady=10)
         self.log("读取配置成功")
 
     def open_settings_window(self):
-        """弹出二级设置菜单"""
         win = tk.Toplevel(self.root)
         win.title("自定义参数")
         win.geometry("400x250")
@@ -139,32 +142,21 @@ class MonitorApp:
         self.log("已弹出浏览器窗口。")
 
     def play_alert(self):
-        """【已优化】解决长时间运行无声问题"""
+        """原生 Windows 音频播放，稳定无堵塞"""
         def _play():
-            # 方案 A: Pygame 方案 (带重置逻辑)
             try:
-                pygame.mixer.quit() # 强制关闭旧驱动连接
-                pygame.mixer.init() # 重新初始化
-                if os.path.exists(MP3_PATH):
-                    pygame.mixer.music.load(MP3_PATH)
-                    pygame.mixer.music.set_volume(0.8)
-                    pygame.mixer.music.play()
-                    start_time = time.time()
-                    # 播放最多持续 10 秒，防止线程挂死
-                    while pygame.mixer.music.get_busy() and self.is_running and (time.time() - start_time < 10):
-                        time.sleep(1)
-                    pygame.mixer.music.stop()
-                    pygame.mixer.quit()
-                    return # 播放成功直接退出
+                if os.path.exists(WAV_PATH):
+                    # SND_FILENAME 指定文件名，SND_ASYNC 异步播放不卡主线程
+                    winsound.PlaySound(WAV_PATH, winsound.SND_FILENAME | winsound.SND_ASYNC)
+                else:
+                    self.log(f"⚠️ 未找到音频文件 {WAV_PATH}，改用系统蜂鸣器")
+                    winsound.Beep(1000, 1500) # 1000Hz 持续 1.5 秒
             except Exception as e:
-                self.log(f"音频驱动异常: {e}")
-
-            # 方案 B: 系统底层兜底 (System Asterisk)
-            try:
-                winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS)
-            except:
-                # 方案 C: 最终物理蜂鸣
-                winsound.Beep(1000, 1000)
+                self.log(f"播放报警声失败: {e}")
+                try:
+                    winsound.Beep(1000, 1500)
+                except:
+                    pass
 
         threading.Thread(target=_play, daemon=True).start()
 
@@ -191,7 +183,7 @@ class MonitorApp:
             
             # 1. 刷新流程
             self.refresh_windows(WINDOW_TITLE_1)
-            time.sleep(1) # 增加小缓冲
+            time.sleep(1)
             if not self.is_running: break
             self.refresh_windows(WINDOW_TITLE_2)
             
@@ -207,16 +199,20 @@ class MonitorApp:
             for label, path in IMAGE_FILES.items():
                 if not self.is_running: break
                 if not os.path.exists(path):
-                    self.log(f"❌ 找不到图片文件: {path}")
+                    self.log(f"❌ 找不到图片模版文件: {path}")
                     continue
                 try:
-                    # 统一使用灰度模式和 0.8 置信度
-                    if pyautogui.locateOnScreen(path, confidence=CONFIDENCE_LEVEL, grayscale=True):
-                        self.log(f"🎯【发现工单】类型: {label}")
+                    # 执行屏幕找图
+                    location = pyautogui.locateOnScreen(path, confidence=CONFIDENCE_LEVEL, grayscale=True)
+                    if location is not None:
+                        self.log(f"🎯【发现工单】类型: {label} (位置: {location})")
                         found = True
-                except: pass
+                except Exception as e:
+                    # 关键修改：输出具体报错，避免因缺少 opencv-python 导致隐蔽静默失败
+                    self.log(f"⚠️ 识别【{label}】时出错: {e}")
             
             if found: 
+                self.log("🔊 正在触发报警声音...")
                 self.play_alert()
             else: 
                 self.log("本轮未发现新工单。")
@@ -242,7 +238,5 @@ class MonitorApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    # 窗口置顶，方便观察
-    # root.attributes("-topmost", True) 
     app = MonitorApp(root)
     root.mainloop()
